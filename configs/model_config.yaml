@@ -1,0 +1,51 @@
+# Transformer Language Model Configuration
+# Optimized for 16GB M4 Mac mini with FP16 mixed precision
+
+model:
+  vocab_size: 32000
+  embedding_dim: 768
+  num_layers: 12          # Reduced from 16 for memory
+  num_heads: 12
+  ff_dim: 2048            # Reduced from 3072 for memory efficiency
+  context_length: 1024    # Reduced from 2048 for 4x less attention memory
+  dropout: 0.1            # Now actually used in model
+  rope_theta: 10000.0     # RoPE base frequency
+
+training:
+  # Batch settings - optimized for memory
+  batch_size: 2
+  gradient_accumulation_steps: 4  # Effective batch = 8
+
+  # Optimizer
+  learning_rate: 3.0e-4
+  weight_decay: 0.1
+  max_grad_norm: 1.0
+
+  # Schedule
+  max_steps: 100000
+  warmup_steps: 1000      # Reduced - faster warmup with gradient accumulation
+  min_lr_ratio: 0.1
+
+  # Checkpointing & logging - optimized frequencies
+  save_every: 5000
+  eval_every: 2500        # Reduced eval frequency saves training time
+  eval_batches: 25        # Configurable eval batch count
+  log_every: 50
+  sample_every: 5000      # Less frequent sampling
+
+  # Data paths
+  train_data_path: "data/train.bin"
+  val_data_path: "data/val.bin"
+  tokenizer_path: "data/tokenizer.model"
+
+  # Output directories
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+
+  # Hardware - FP16 actually enabled now
+  mixed_precision: true
+  seed: 42
+
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.001

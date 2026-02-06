@@ -1,0 +1,44 @@
+# Data files (large binary files)
+data/*.bin
+data/*.npy
+data/*.npz
+raw_data/
+
+# Model checkpoints
+checkpoints/
+*.safetensors
+*.pt
+*.pth
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Misc
+*.tar.gz
+*.zip
+
+.claude/

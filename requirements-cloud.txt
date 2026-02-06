@@ -1,0 +1,15 @@
+# Requirements for cloud GPU training (NVIDIA H100/A100)
+# Install with: pip install -r requirements-cloud.txt
+
+# PyTorch 2.0+ with CUDA support
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch>=2.2.0
+
+# Training dependencies
+numpy>=1.24.0
+pyyaml>=6.0
+tqdm>=4.65.0
+sentencepiece>=0.1.99
+
+# Optional: for monitoring
+# wandb>=0.15.0

@@ -1,0 +1,52 @@
+# Transformer Language Model Configuration
+# Conservative settings for 16GB M4 Mac mini - use this first to verify stability
+# This config uses ~40% less memory than the main config
+
+model:
+  vocab_size: 32000
+  embedding_dim: 512       # Reduced from 768
+  num_layers: 8            # Reduced from 12
+  num_heads: 8             # Reduced from 12
+  ff_dim: 1536             # Reduced (3x embedding_dim)
+  context_length: 512      # Very conservative for testing
+  dropout: 0.1
+  rope_theta: 10000.0
+
+training:
+  # Batch settings - smaller for stability
+  batch_size: 2
+  gradient_accumulation_steps: 2  # Effective batch = 4
+
+  # Optimizer
+  learning_rate: 3.0e-4
+  weight_decay: 0.1
+  max_grad_norm: 1.0
+
+  # Schedule
+  max_steps: 100000
+  warmup_steps: 500        # Faster warmup for testing
+  min_lr_ratio: 0.1
+
+  # Checkpointing & logging
+  save_every: 5000
+  eval_every: 1000
+  eval_batches: 10         # Fewer eval batches
+  log_every: 25
+  sample_every: 2000
+
+  # Data paths
+  train_data_path: "data/train.bin"
+  val_data_path: "data/val.bin"
+  tokenizer_path: "data/tokenizer.model"
+
+  # Output directories
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+
+  # Hardware
+  mixed_precision: true
+  seed: 42
+
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.001

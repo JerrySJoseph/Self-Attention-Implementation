@@ -1,0 +1,53 @@
+# Transformer Language Model Configuration
+# Optimized for H100 80GB GPU on Vast.ai
+# Much larger batch sizes for faster training
+
+model:
+  vocab_size: 32000
+  embedding_dim: 768
+  num_layers: 12
+  num_heads: 12
+  ff_dim: 2048
+  context_length: 1024
+  dropout: 0.1
+  rope_theta: 10000.0
+
+training:
+  # Large batch sizes - H100 80GB can handle this easily
+  batch_size: 64            # 32x larger than Mac config
+  gradient_accumulation_steps: 2  # Effective batch = 128
+
+  # Optimizer
+  learning_rate: 6.0e-4     # Higher LR for larger batch
+  weight_decay: 0.1
+  max_grad_norm: 1.0
+
+  # Schedule
+  max_steps: 50000          # Fewer steps needed with larger batch
+  warmup_steps: 500
+  min_lr_ratio: 0.1
+
+  # Checkpointing & logging
+  save_every: 5000
+  eval_every: 500           # More frequent eval (steps go faster)
+  eval_batches: 50
+  log_every: 10
+  sample_every: 2500
+
+  # Data paths
+  train_data_path: "data/train.bin"
+  val_data_path: "data/val.bin"
+  tokenizer_path: "data/tokenizer.model"
+
+  # Output directories
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+
+  # Hardware - H100 optimizations
+  mixed_precision: true     # Use bfloat16
+  compile_model: true       # torch.compile for speed
+  seed: 42
+
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.001
