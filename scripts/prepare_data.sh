@@ -99,9 +99,9 @@ esac
 echo ""
 echo "Training tokenizer and preparing data..."
 
-# Use the all-in-one data preparation
+# Use the platform-independent data preparation script
 cd "$(dirname "$0")/.."
-python3 src/data.py all \
+python3 -m src.prepare_data \
     --raw-data "$DATA_DIR" \
     --output-dir "$OUTPUT_DIR" \
     --vocab-size "$VOCAB_SIZE"
