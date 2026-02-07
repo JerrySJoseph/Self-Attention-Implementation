@@ -68,8 +68,8 @@ def train_tokenizer(input_dir: str, output_path: str, vocab_size: int = 32000):
     return str(output_path) + ".model"
 
 
-def tokenize_data(input_dir: str, output_path: str, tokenizer_path: str):
-    """Tokenize all text files and save as binary."""
+def tokenize_data(input_dir: str, output_path: str, tokenizer_path: str, chunk_size: int = 10000):
+    """Tokenize all text files and save as binary (memory-efficient streaming)."""
     import sentencepiece as spm
 
     input_dir = Path(input_dir)
@@ -85,28 +85,52 @@ def tokenize_data(input_dir: str, output_path: str, tokenizer_path: str):
     # Find all text files
     text_files = list(input_dir.glob("*.txt"))
 
-    # Tokenize everything
-    all_tokens = []
+    total_tokens = 0
     total_chars = 0
 
-    for txt_file in text_files:
-        print(f"Tokenizing {txt_file.name}...")
-        with open(txt_file, "r", encoding="utf-8") as f:
-            text = f.read()
-            total_chars += len(text)
+    # Write tokens directly to file in chunks (memory efficient)
+    with open(output_path, "wb") as out_f:
+        for txt_file in text_files:
+            print(f"Tokenizing {txt_file.name}...")
+            file_tokens = 0
+            file_chars = 0
 
-        tokens = sp.encode(text)
-        all_tokens.extend(tokens)
-        print(f"  {len(tokens):,} tokens from {len(text):,} chars")
+            with open(txt_file, "r", encoding="utf-8") as f:
+                buffer = []
+                lines_processed = 0
 
-    # Convert to numpy and save
-    tokens_array = np.array(all_tokens, dtype=np.uint16)
+                for line in f:
+                    buffer.append(line)
+                    lines_processed += 1
 
-    print(f"\nTotal: {len(tokens_array):,} tokens from {total_chars:,} chars")
-    print(f"Compression ratio: {total_chars / len(tokens_array):.2f} chars/token")
+                    # Process in chunks
+                    if len(buffer) >= chunk_size:
+                        text = "".join(buffer)
+                        file_chars += len(text)
+                        tokens = sp.encode(text)
+                        file_tokens += len(tokens)
 
-    # Save as memory-mapped file
-    tokens_array.tofile(output_path)
+                        # Write chunk to file
+                        np.array(tokens, dtype=np.uint16).tofile(out_f)
+                        buffer = []
+
+                        if lines_processed % 100000 == 0:
+                            print(f"  Processed {lines_processed:,} lines...")
+
+                # Process remaining buffer
+                if buffer:
+                    text = "".join(buffer)
+                    file_chars += len(text)
+                    tokens = sp.encode(text)
+                    file_tokens += len(tokens)
+                    np.array(tokens, dtype=np.uint16).tofile(out_f)
+
+            print(f"  {file_tokens:,} tokens from {file_chars:,} chars")
+            total_tokens += file_tokens
+            total_chars += file_chars
+
+    print(f"\nTotal: {total_tokens:,} tokens from {total_chars:,} chars")
+    print(f"Compression ratio: {total_chars / total_tokens:.2f} chars/token")
     print(f"Saved to {output_path} ({output_path.stat().st_size / 1e6:.1f} MB)")
 
     return str(output_path)
