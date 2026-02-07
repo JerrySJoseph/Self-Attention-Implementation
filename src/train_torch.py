@@ -313,16 +313,18 @@ def train(
     """Main training loop."""
     global _interrupted
 
-    # Device setup
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cpu":
-        logger.warning("CUDA not available - training on CPU will be slow!")
-
-    # Print GPU info
+    # Device setup - prefer CUDA > MPS (Apple Silicon) > CPU
     if torch.cuda.is_available():
+        device = "cuda"
         gpu_name = torch.cuda.get_device_name(0)
         gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9
         logger.info(f"GPU: {gpu_name} ({gpu_mem:.1f} GB)")
+    elif torch.backends.mps.is_available():
+        device = "mps"
+        logger.info("Using Apple Silicon GPU (MPS)")
+    else:
+        device = "cpu"
+        logger.warning("No GPU available - training on CPU will be slow!")
 
     # Set seeds
     torch.manual_seed(training_config.seed)
@@ -341,19 +343,21 @@ def train(
     actual_params = model.count_parameters()
     logger.info(f"Actual parameters: {actual_params:,}")
 
-    # Compile model for faster training (PyTorch 2.0+)
-    if training_config.compile_model and hasattr(torch, 'compile'):
+    # Compile model for faster training (PyTorch 2.0+, CUDA only)
+    if training_config.compile_model and hasattr(torch, 'compile') and device == "cuda":
         logger.info("Compiling model with torch.compile...")
         model = torch.compile(model)
         logger.info("Model compiled!")
+    elif training_config.compile_model and device != "cuda":
+        logger.info("torch.compile skipped (only supported on CUDA)")
 
-    # Create optimizer
+    # Create optimizer (fused AdamW only on CUDA)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=training_config.learning_rate,
         weight_decay=training_config.weight_decay,
         betas=(0.9, 0.95),
-        fused=True if torch.cuda.is_available() else False,  # Fused AdamW is faster
+        fused=(device == "cuda"),
     )
 
     schedule = CosineSchedule(
@@ -400,8 +404,9 @@ def train(
     logger.info(f"Effective batch size: {effective_batch_size}")
     logger.info(f"Tokens per step: {tokens_per_step:,}")
 
-    # Enable gradient scaler for mixed precision
-    scaler = torch.amp.GradScaler('cuda', enabled=training_config.mixed_precision)
+    # Enable gradient scaler for mixed precision (CUDA only, MPS doesn't support it)
+    use_scaler = training_config.mixed_precision and device == "cuda"
+    scaler = torch.amp.GradScaler('cuda', enabled=use_scaler)
 
     model.train()
     train_iter = iter(train_loader)
@@ -431,17 +436,22 @@ def train(
                 target_ids = target_ids.to(device)
 
                 # Mixed precision forward/backward
-                with torch.amp.autocast('cuda', dtype=dtype, enabled=training_config.mixed_precision):
+                autocast_device = 'cuda' if device == 'cuda' else 'cpu'  # MPS uses CPU autocast
+                with torch.amp.autocast(autocast_device, dtype=dtype, enabled=training_config.mixed_precision and device == 'cuda'):
                     loss = compute_loss(model, input_ids, target_ids)
                     loss = loss / training_config.gradient_accumulation_steps
 
-                scaler.scale(loss).backward()
+                if use_scaler:
+                    scaler.scale(loss).backward()
+                else:
+                    loss.backward()
 
                 accumulated_loss += loss.item()
                 tokens_processed += input_ids.numel()
 
             # Unscale gradients and clip
-            scaler.unscale_(optimizer)
+            if use_scaler:
+                scaler.unscale_(optimizer)
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), training_config.max_grad_norm)
 
             # Update learning rate
@@ -450,8 +460,11 @@ def train(
                 param_group['lr'] = current_lr
 
             # Optimizer step
-            scaler.step(optimizer)
-            scaler.update()
+            if use_scaler:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
 
             # Calculate metrics
             avg_loss = accumulated_loss

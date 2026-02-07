@@ -1,0 +1,53 @@
+# Transformer Language Model Configuration
+# For PyTorch on Mac (Apple Silicon MPS backend)
+# Use this if you prefer PyTorch over MLX on your Mac
+
+model:
+  vocab_size: 32000
+  embedding_dim: 512
+  num_layers: 8
+  num_heads: 8
+  ff_dim: 1536
+  context_length: 512
+  dropout: 0.1
+  rope_theta: 10000.0
+
+training:
+  # Conservative batch sizes for MPS
+  batch_size: 4
+  gradient_accumulation_steps: 4  # Effective batch = 16
+
+  # Optimizer
+  learning_rate: 3.0e-4
+  weight_decay: 0.1
+  max_grad_norm: 1.0
+
+  # Schedule
+  max_steps: 100000
+  warmup_steps: 500
+  min_lr_ratio: 0.1
+
+  # Checkpointing & logging
+  save_every: 5000
+  eval_every: 1000
+  eval_batches: 20
+  log_every: 25
+  sample_every: 2000
+
+  # Data paths
+  train_data_path: "data/train.bin"
+  val_data_path: "data/val.bin"
+  tokenizer_path: "data/tokenizer.model"
+
+  # Output directories
+  checkpoint_dir: "checkpoints"
+  log_dir: "logs"
+
+  # Hardware
+  mixed_precision: false  # MPS doesn't benefit from this
+  compile_model: false    # Not supported on MPS
+  seed: 42
+
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.001
